@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual Environment
+venv/
+env/
+
+# Model Files
+*.pkl
+*.h5
+*.pt
+
+# Dataset
+/data/raw/
+/images/downloaded_images/
+
+# VS Code
+.vscode/
+
+# Mac/Linux
+.DS_Store
