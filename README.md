@@ -37,5 +37,4 @@ product-price-predictor/
 ├── models/
 ├── outputs/
 ├── requirements.txt
-├── README.md
-└── main.py
+└── README.md
