@@ -1,0 +1,12 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+opencv-python
+Pillow
+requests
+xgboost
+lightgbm
+joblib
+jupyter
