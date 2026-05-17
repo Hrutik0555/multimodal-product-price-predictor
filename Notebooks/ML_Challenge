@@ -1,0 +1,464 @@
+import os
+import pandas as pd
+import numpy as np
+from product_price_predictor import ProductDataset, PricePredictionModel, download_and_save_images
+
+# Configuration
+DATA_DIR = "dataset"  # Update this to your dataset directory
+TRAIN_FILE = os.path.join(DATA_DIR, "train.csv")
+TEST_FILE = os.path.join(DATA_DIR, "test.csv")
+OUTPUT_FILE = os.path.join(DATA_DIR, "predictions.csv")
+IMAGE_DIR = os.path.join(DATA_DIR, "images")
+MODEL_DIR = "models"
+
+# Create directories if they don't exist
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(IMAGE_DIR, exist_ok=True)
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+def train_model():
+    """Train the product price prediction model"""
+    print("Starting Product Price Prediction Model Training")
+    
+    # Check if train file exists, if not, copy from downloads
+    if not os.path.exists(TRAIN_FILE):
+        print(f"Train file not found at {TRAIN_FILE}")
+        source_path = r"c:\Users\Hrutik Burde\Downloads\student_resource\dataset\train.csv"
+        try:
+            # Create dataset directory if it doesn't exist
+            os.makedirs(os.path.dirname(TRAIN_FILE), exist_ok=True)
+            
+            # Read from source and write to destination
+            df = pd.read_csv(source_path)
+            df.to_csv(TRAIN_FILE, index=False)
+            print(f"Copied train data from {source_path} to {TRAIN_FILE}")
+        except Exception as e:
+            print(f"Error copying train file: {e}")
+            return
+    
+    # Load training data
+    print("Loading training data...")
+    try:
+        train_df = pd.read_csv(TRAIN_FILE)
+        print(f"Loaded {len(train_df)} training samples")
+        
+        # Download images for training data
+        print("Downloading images for training data...")
+        download_and_save_images(train_df, IMAGE_DIR)
+    except Exception as e:
+        print(f"Error loading training data: {e}")
+        return
+    
+    # Create dataset
+    train_dataset = ProductDataset(TRAIN_FILE, image_dir=IMAGE_DIR)
+    
+    # Train model
+    model = PricePredictionModel()
+    print("Training model...")
+    val_mae, val_rmse, val_smape = model.train(train_dataset, val_size=0.2)
+    
+    # Save model
+    model_path = os.path.join(MODEL_DIR, "price_model.pkl")
+    model.save(model_path)
+    
+    # Print performance metrics
+    print("\nModel Performance:")
+    print(f"Validation MAE: {val_mae:.4f}")
+    print(f"Validation RMSE: {val_rmse:.4f}")
+    print(f"Validation SMAPE: {val_smape:.4f}%")
+    
+    print(f"\nModel saved to {model_path}")
+    print("Training completed successfully!")
+
+if __name__ == "__main__":
+    train_model()
+
+
+import os
+import pandas as pd
+import numpy as np
+from product_price_predictor import ProductDataset, PricePredictionModel, download_and_save_images
+
+# Configuration
+DATA_DIR = "dataset"
+TEST_FILE = os.path.join(DATA_DIR, "test.csv")
+OUTPUT_FILE = os.path.join(DATA_DIR, "predictions.csv")
+IMAGE_DIR = os.path.join(DATA_DIR, "images")
+MODEL_DIR = "models"
+MODEL_PATH = os.path.join(MODEL_DIR, "price_model.pkl")
+
+def predict_prices():
+    """Generate price predictions for test data"""
+    print("Starting Product Price Prediction")
+    
+    # Check if test file exists, if not, copy from downloads
+    if not os.path.exists(TEST_FILE):
+        print(f"Test file not found at {TEST_FILE}")
+        source_path = r"c:\Users\Hrutik Burde\Downloads\student_resource\dataset\test.csv"
+        try:
+            # Create dataset directory if it doesn't exist
+            os.makedirs(os.path.dirname(TEST_FILE), exist_ok=True)
+            
+            # Read from source and write to destination
+            df = pd.read_csv(source_path)
+            df.to_csv(TEST_FILE, index=False)
+            print(f"Copied test data from {source_path} to {TEST_FILE}")
+        except Exception as e:
+            print(f"Error copying test file: {e}")
+            return
+    
+    # Check if model exists
+    if not os.path.exists(MODEL_PATH):
+        print(f"Model not found at {MODEL_PATH}. Please train the model first.")
+        return
+    
+    # Load test data
+    print("Loading test data...")
+    try:
+        test_df = pd.read_csv(TEST_FILE)
+        print(f"Loaded {len(test_df)} test samples")
+        
+        # Download images for test data
+        print("Downloading images for test data...")
+        download_and_save_images(test_df, IMAGE_DIR)
+    except Exception as e:
+        print(f"Error loading test data: {e}")
+        return
+    
+    # Create test dataset
+    test_dataset = ProductDataset(TEST_FILE, image_dir=IMAGE_DIR, is_test=True)
+    
+    # Load model
+    model = PricePredictionModel()
+    model.load(MODEL_PATH)
+    
+    # Generate predictions
+    print("Generating predictions...")
+    predictions = model.predict(test_dataset)
+    
+    # Save predictions
+    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    predictions.to_csv(OUTPUT_FILE, index=False)
+    print(f"Predictions saved to {OUTPUT_FILE}")
+    
+    # Display sample predictions
+    print("\nSample predictions:")
+    print(predictions.head())
+    
+    print("\nPrediction completed successfully!")
+
+if __name__ == "__main__":
+    predict_prices()
+
+
+import os
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import re
+import joblib
+
+# Configuration
+DATA_DIR = "dataset"
+TRAIN_FILE = os.path.join(DATA_DIR, "train.csv")
+TEST_FILE = os.path.join(DATA_DIR, "test.csv")
+OUTPUT_FILE = os.path.join(DATA_DIR, "predictions.csv")
+MODEL_DIR = "models"
+
+# Create directories if they don't exist
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+# Text preprocessing
+def preprocess_text(text):
+    """Clean and preprocess text data"""
+    if not isinstance(text, str):
+        return ""
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove special characters and digits
+    text = re.sub(r'[^\w\s]', ' ', text)
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
+
+# Feature extraction from text
+def extract_text_features(df):
+    """Extract features from catalog content"""
+    # Extract IPQ (Item Pack Quantity) if available
+    df['ipq'] = df['catalog_content'].str.extract(r'IPQ:?\s*(\d+)', flags=re.IGNORECASE).astype('float')
+    
+    # Extract dimensions if available
+    df['has_dimensions'] = df['catalog_content'].str.contains(r'\d+\s*x\s*\d+\s*x\s*\d+', flags=re.IGNORECASE).astype('int')
+    
+    # Extract weight if available
+    df['has_weight'] = df['catalog_content'].str.contains(r'\d+\s*(kg|g|pound|lb|oz|ounce)', flags=re.IGNORECASE).astype('int')
+    
+    # Extract brand mentions
+    df['has_brand'] = df['catalog_content'].str.contains(r'brand|manufacturer', flags=re.IGNORECASE).astype('int')
+    
+    # Extract material mentions
+    df['has_material'] = df['catalog_content'].str.contains(r'material|made of|made from', flags=re.IGNORECASE).astype('int')
+    
+    # Clean text for TF-IDF
+    df['clean_text'] = df['catalog_content'].apply(preprocess_text)
+    
+    return df
+
+class SimplePricePredictor:
+    def __init__(self):
+        self.text_vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
+        self.model = None
+    
+    def extract_features(self, df):
+        """Extract features from dataframe"""
+        # Extract text features
+        print("Extracting text features...")
+        df = extract_text_features(df)
+        
+        # Fit vectorizer if not already fit
+        if not hasattr(self.text_vectorizer, 'vocabulary_'):
+            self.text_vectorizer.fit(df['clean_text'])
+        
+        text_features = self.text_vectorizer.transform(df['clean_text']).toarray()
+        
+        # Extract numerical features
+        numerical_features = df[['ipq', 'has_dimensions', 'has_weight', 'has_brand', 'has_material']].fillna(0).values
+        
+        # Combine features
+        combined_features = np.hstack((text_features, numerical_features))
+        
+        return combined_features
+    
+    def train(self, train_df, val_size=0.2):
+        """Train the price prediction model"""
+        # Extract features
+        X = self.extract_features(train_df)
+        y = train_df['price'].values
+        
+        # Split into train and validation sets
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=val_size, random_state=42)
+        
+        print(f"Training with {X_train.shape[0]} samples, validating with {X_val.shape[0]} samples")
+        
+        # Train model
+        print("Training model...")
+        self.model = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42)
+        self.model.fit(X_train, y_train)
+        
+        # Evaluate on validation set
+        val_preds = self.model.predict(X_val)
+        val_mae = mean_absolute_error(y_val, val_preds)
+        val_rmse = np.sqrt(mean_squared_error(y_val, val_preds))
+        
+        print(f"Validation MAE: {val_mae:.4f}, RMSE: {val_rmse:.4f}")
+        
+        # Calculate SMAPE
+        smape = 100 * np.mean(np.abs(val_preds - y_val) / ((np.abs(y_val) + np.abs(val_preds)) / 2))
+        print(f"Validation SMAPE: {smape:.4f}%")
+        
+        return val_mae, val_rmse, smape
+    
+    def predict(self, test_df):
+        """Generate predictions for test dataset"""
+        # Extract features
+        X_test = self.extract_features(test_df)
+        
+        # Generate predictions
+        predictions = self.model.predict(X_test)
+        
+        # Ensure predictions are positive
+        predictions = np.maximum(predictions, 0.01)
+        
+        # Create output dataframe
+        output_df = pd.DataFrame({
+            'sample_id': test_df['sample_id'],
+            'price': predictions
+        })
+        
+        return output_df
+    
+    def save(self, model_path):
+        """Save the trained model"""
+        joblib.dump({
+            'model': self.model,
+            'vectorizer': self.text_vectorizer
+        }, model_path)
+        print(f"Model saved to {model_path}")
+    
+    def load(self, model_path):
+        """Load a trained model"""
+        saved_model = joblib.load(model_path)
+        self.model = saved_model['model']
+        self.text_vectorizer = saved_model['vectorizer']
+        print(f"Model loaded from {model_path}")
+
+def train_and_evaluate():
+    """Train and evaluate the price prediction model"""
+    print("Starting Simple Product Price Prediction")
+    
+    # Create dataset directory if it doesn't exist
+    os.makedirs(DATA_DIR, exist_ok=True)
+    
+    # Check if train file exists, if not, copy from downloads
+    if not os.path.exists(TRAIN_FILE):
+        print(f"Train file not found at {TRAIN_FILE}")
+        source_path = r"c:\Users\Hrutik Burde\Downloads\student_resource\dataset\train.csv"
+        try:
+            # Create dataset directory if it doesn't exist
+            os.makedirs(os.path.dirname(TRAIN_FILE), exist_ok=True)
+            
+            # Read from source and write to destination
+            df = pd.read_csv(source_path)
+            df.to_csv(TRAIN_FILE, index=False)
+            print(f"Copied train data from {source_path} to {TRAIN_FILE}")
+        except Exception as e:
+            print(f"Error copying train file: {e}")
+            # Try to create a sample dataset for testing
+            create_sample_dataset()
+    
+    # Load training data
+    print("Loading training data...")
+    try:
+        train_df = pd.read_csv(TRAIN_FILE)
+        print(f"Loaded {len(train_df)} training samples")
+    except Exception as e:
+        print(f"Error loading training data: {e}")
+        # Try to create a sample dataset for testing
+        create_sample_dataset()
+        train_df = pd.read_csv(TRAIN_FILE)
+    
+    # Train model
+    model = SimplePricePredictor()
+    print("Training model...")
+    val_mae, val_rmse, val_smape = model.train(train_df, val_size=0.2)
+    
+    # Save model
+    model_path = os.path.join(MODEL_DIR, "price_model.pkl")
+    model.save(model_path)
+    
+    # Print performance metrics
+    print("\nModel Performance:")
+    print(f"Validation MAE: {val_mae:.4f}")
+    print(f"Validation RMSE: {val_rmse:.4f}")
+    print(f"Validation SMAPE: {val_smape:.4f}%")
+    
+    print(f"\nModel saved to {model_path}")
+    print("Training completed successfully!")
+    
+    return model
+
+def create_sample_dataset():
+    """Create a sample dataset for testing"""
+    print("Creating sample dataset for testing...")
+    
+    # Create sample data
+    sample_data = {
+        'sample_id': [f'sample_{i}' for i in range(1, 101)],
+        'catalog_content': [
+            f"Product {i} - This is a sample product with IPQ: {i % 10 + 1}. " +
+            f"Dimensions: {i % 5 + 1}x{i % 4 + 2}x{i % 3 + 3} inches. " +
+            f"Weight: {i % 10 + 1} lb. Brand: Sample Brand {i % 5}. " +
+            f"Made of high-quality material."
+            for i in range(1, 101)
+        ],
+        'image_link': [f'https://example.com/image_{i}.jpg' for i in range(1, 101)],
+        'price': [np.random.uniform(10, 1000) for _ in range(100)]
+    }
+    
+    # Create dataframe
+    df = pd.DataFrame(sample_data)
+    
+    # Save to CSV
+    os.makedirs(os.path.dirname(TRAIN_FILE), exist_ok=True)
+    df.to_csv(TRAIN_FILE, index=False)
+    
+    # Create test data
+    test_data = {
+        'sample_id': [f'test_{i}' for i in range(1, 51)],
+        'catalog_content': [
+            f"Test Product {i} - This is a test product with IPQ: {i % 10 + 1}. " +
+            f"Dimensions: {i % 5 + 1}x{i % 4 + 2}x{i % 3 + 3} inches. " +
+            f"Weight: {i % 10 + 1} lb. Brand: Test Brand {i % 5}. " +
+            f"Made of high-quality material."
+            for i in range(1, 51)
+        ],
+        'image_link': [f'https://example.com/test_image_{i}.jpg' for i in range(1, 51)]
+    }
+    
+    # Create dataframe
+    test_df = pd.DataFrame(test_data)
+    
+    # Save to CSV
+    os.makedirs(os.path.dirname(TEST_FILE), exist_ok=True)
+    test_df.to_csv(TEST_FILE, index=False)
+    
+    print(f"Created sample dataset with {len(df)} training samples and {len(test_df)} test samples")
+
+def generate_predictions():
+    """Generate predictions for test data"""
+    print("Generating predictions for test data...")
+    
+    # Check if model exists
+    model_path = os.path.join(MODEL_DIR, "price_model.pkl")
+    if not os.path.exists(model_path):
+        print(f"Model not found at {model_path}. Training a new model...")
+        model = train_and_evaluate()
+    else:
+        # Load model
+        model = SimplePricePredictor()
+        model.load(model_path)
+    
+    # Check if test file exists
+    if not os.path.exists(TEST_FILE):
+        print(f"Test file not found at {TEST_FILE}")
+        source_path = r"c:\Users\Hrutik Burde\Downloads\student_resource\dataset\test.csv"
+        try:
+            # Create dataset directory if it doesn't exist
+            os.makedirs(os.path.dirname(TEST_FILE), exist_ok=True)
+            
+            # Read from source and write to destination
+            df = pd.read_csv(source_path)
+            df.to_csv(TEST_FILE, index=False)
+            print(f"Copied test data from {source_path} to {TEST_FILE}")
+        except Exception as e:
+            print(f"Error copying test file: {e}")
+            # Try to create a sample dataset for testing
+            create_sample_dataset()
+    
+    # Load test data
+    print("Loading test data...")
+    try:
+        test_df = pd.read_csv(TEST_FILE)
+        print(f"Loaded {len(test_df)} test samples")
+    except Exception as e:
+        print(f"Error loading test data: {e}")
+        return
+    
+    # Generate predictions
+    print("Generating predictions...")
+    predictions = model.predict(test_df)
+    
+    # Save predictions
+    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    predictions.to_csv(OUTPUT_FILE, index=False)
+    print(f"Predictions saved to {OUTPUT_FILE}")
+    
+    # Display sample predictions
+    print("\nSample predictions:")
+    print(predictions.head())
+    print("\nPrediction completed successfully!")
+
+if __name__ == "__main__":
+    # Train and evaluate model
+    train_and_evaluate()
+    
+    # Generate predictions
+    generate_predictions()
