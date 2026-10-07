@@ -1,68 +1,149 @@
-# multimodal-product-price-predictor
+# Multimodal Product Price Predictor
 
-An end-to-end multimodal machine learning pipeline that uses tabular metadata, NLP/regex feature extraction, and computer vision to predict product list prices.
+An end-to-end Machine Learning and Deep Learning pipeline designed to predict e-commerce product prices using multimodal data (textual descriptions and product images).
 
-## Features
+## 📌 Overview
 
-- Product price prediction (log-target regression)
-- Regex extraction of value, unit, pack quantity and other metadata from text
-- TF-IDF + truncated SVD text representation
-- Parallel image downloading with on-disk caching
-- OpenCV image features (HSV histograms, channel statistics, edges, sharpness)
-- Ensemble of XGBoost, RandomForest and HistGradientBoosting
-- Evaluation metrics (MAE, RMSE, R2, SMAPE) and an actual-vs-predicted plot
-- CSV prediction export
+Accurate price prediction in e-commerce requires evaluating both textual metadata (titles, specifications, descriptions) and visual cues (product design, brand aesthetics, packaging). 
 
-## Tech stack
+The **Multimodal Product Price Predictor** combines text features (extracted using NLP transformers/embeddings) and image features (extracted via Vision models like ResNet, EfficientNet, or CLIP) into a unified architecture to perform robust regression for price prediction.
 
-Python, scikit-learn, pandas, NumPy, Matplotlib, OpenCV, XGBoost, Jupyter
+---
 
-## Project structure
+## 📁 Repository Structure
 
 ```
 multimodal-product-price-predictor/
-├── data/                 # train.csv, test.csv (see data/README.md)
-├── models/               # saved model bundle (price_model.joblib)
-├── notebooks/            # exploration notebook
-├── outputs/              # metrics.json, plot, predictions.csv
-├── src/
-│   ├── config.py         # paths, column names, hyperparameters
-│   ├── text_features.py  # regex feature extraction
-│   ├── image_utils.py    # image download + OpenCV features
-│   ├── preprocessing.py  # FeatureBuilder (text + image)
-│   ├── models.py         # ensemble definition
-│   ├── evaluate.py       # metrics and plots
-│   ├── train.py          # training entrypoint
-│   └── predict.py        # inference entrypoint
-├── requirements.txt
-└── README.md
+│
+├── data/                       # Directory for raw and preprocessed datasets
+│   ├── .gitkeep
+│   └── README.md               # Guidelines for dataset structure and formatting
+│
+├── models/                     # Directory for saved model checkpoints & weights
+│   └── .gitkeep
+│
+├── notebooks/                  # Jupyter notebooks for EDA and experimentation
+│   └── exploration.ipynb
+│
+├── outputs/                    # Log files, metrics, and generated plots
+│   └── .gitkeep
+│
+├── src/                        # Modular source code
+│   ├── __init__.py             # Package initialization
+│   ├── config.py               # Global configuration, paths, and hyperparameters
+│   ├── preprocessing.py        # Data cleaning and tabular pipeline utilities
+│   ├── text_features.py       # Text embedding generation and feature extraction
+│   ├── image_utils.py          # Image loading, transformations, and feature extraction
+│   ├── models.py               # PyTorch/TensorFlow multimodal neural network models
+│   ├── train.py                # Model training and validation loops
+│   ├── evaluate.py             # Model evaluation metrics (RMSE, MAE, MAPE, $R^2$)
+│   └── predict.py              # Inference script for new product samples
+│
+├── .gitignore                  # Git ignore directives
+├── README.md                   # Project documentation
+└── requirements.txt            # Python dependencies
 ```
 
-## Installation
+---
+
+## ✨ Features
+
+- **Multimodal Integration:** Fuses textual features (TF-IDF / BERT embeddings) and image embeddings (CNN / Vision Transformers) with tabular attributes.
+- **Flexible Pipeline:** Modular modules for data preprocessing, feature engineering, training, and evaluation.
+- **Config-Driven:** Easily tune hyperparameters, paths, and model architectures in `src/config.py`.
+- **Inference Ready:** Includes `predict.py` for direct evaluation and inference on unseen product items.
+
+---
+
+## 🛠️ Installation & Setup
+
+### 1. Clone the Repository
 
 ```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+git clone https://github.com/Hrutik0555/multimodal-product-price-predictor.git
+cd multimodal-product-price-predictor
+```
+
+### 2. Create a Virtual Environment
+
+```bash
+# Using venv
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+---
 
-Put `train.csv` and `test.csv` in `data/` (columns described in [data/README.md](data/README.md)), then:
+## 🚀 Quick Start & Usage
 
-```bash
-python -m src.train                # text + image features
-python -m src.train --no-images    # text/tabular only (fast)
-python -m src.predict              # writes outputs/predictions.csv
+### 1. Prepare Data
+Place your raw datasets inside the `data/` directory. See [`data/README.md`](./data/README.md) for expected schema formatting (e.g., product text fields, image paths, and target price $y$).
+
+### 2. Configure Experiment Settings
+Adjust hyperparameters, model configurations, and file paths in `src/config.py`:
+
+```python
+# Example setup in src/config.py
+TEXT_MODEL_NAME = "bert-base-uncased"
+IMAGE_MODEL_NAME = "resnet50"
+BATCH_SIZE = 32
+LEARNING_RATE = 1e-4
+EPOCHS = 10
 ```
 
-## How it works
+### 3. Train the Model
 
-1. **Text/tabular:** regexes parse `Value`, `Unit` and pack quantities; units are normalised to grams / millilitres / counts. Text statistics are added, and TF-IDF is compressed to 64 dimensions with SVD.
-2. **Images:** downloaded once, cached by URL hash, then summarised into colour, edge and sharpness features. Missing images give zero vectors plus a `has_image = 0` flag.
-3. **Model:** features are concatenated and an ensemble is trained on `log1p(price)`; predictions are mapped back with `expm1`.
-4. **Evaluation:** a 15% hold-out set gives MAE, RMSE, R2 and SMAPE; the final model is then refit on all data.
+Run the training pipeline:
 
-## Notes
+```bash
+python -m src.train
+```
 
-- Column names are assumptions (`sample_id`, `catalog_content`, `image_link`, `price`); change them in `src/config.py`.
-- Hand-crafted image features are lightweight; CNN embeddings would be a natural upgrade.
+### 4. Evaluate the Model
+
+Evaluate performance metrics (RMSE, MAE, $R^2$) on test data:
+
+```bash
+python -m src.evaluate
+```
+
+### 5. Run Predictions / Inference
+
+To run inference on new product inputs:
+
+```bash
+python -m src.predict --image_path path/to/image.jpg --description "Product Description"
+```
+
+---
+
+## 📊 Architecture Overview
+
+1. **Text Pipeline:** Textual descriptions pass through `src/text_features.py` to extract contextual sequence embeddings $E_{text}$.
+2. **Vision Pipeline:** Images pass through `src/image_utils.py` for scaling, normalization, and feature extraction $E_{img}$.
+3. **Multimodal Fusion:** Features $E_{text}$ and $E_{img}$ are concatenated and passed through dense classification layers defined in `src/models.py`.
+4. **Target:** Regresses continuous target value representing the predicted price $\hat{y}$.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to open an issue or submit a pull request.
+
+1. Fork the Repository
+2. Create your Feature Branch (`git checkout -b feature/NewFeature`)
+3. Commit your Changes (`git commit -m 'Add NewFeature'`)
+4. Push to the Branch (`git push origin feature/NewFeature`)
+5. Open a Pull Request
+
+---
+
+## 📜 License
+
+Distributed under the MIT License. See `LICENSE` for details.
